@@ -16,7 +16,7 @@ import (
 
 const mb = 1024 * 1024
 
-var workPath = os.Getenv("WORK_PATH")
+var workPath string
 var AuthIP map[string]bool
 var AuthorizationHeader string
 
@@ -25,7 +25,7 @@ func main() {
 	if err := loadEnv(); err != nil {
 		log.Fatalf("Error loading .env file: %v", err)
 	}
-
+	workPath = os.Getenv("WORK_PATH")
 	r := gin.Default()
 	r.Use(IPAndAuthorizationMiddleware())
 	r.GET(os.Getenv("DOWNLOAD_RELATIVE_PATH")+"/*path", handleDownload)
