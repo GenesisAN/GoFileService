@@ -1,6 +1,6 @@
 # GoFileService
 
-基于GOlang编写的简易文件服务。
+基于Golang编写的简易文件服务。
 
 - [x] 文件上传
 
