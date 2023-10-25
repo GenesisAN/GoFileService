@@ -20,9 +20,19 @@ import (
 
 const mb = 1024 * 1024
 
-var workPath string
+var (
+    version   string
+    buildDate string
+    gitHash   string
+    workPath string
+)
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "-version" {
+		fmt.Printf("Version: %s\nBuild Date: %s\nGit Commit: %s\n", version, buildDate, gitHash)
+		return
+	}
+	
 	// Load environment variables
 	if err := loadEnv(); err != nil {
 		log.Fatalf("Error loading .env file: %v", err)

@@ -1,0 +1,70 @@
+name: Build
+
+on:
+  push:
+    branches: [ "main" ]
+    tags:
+      - 'v*'
+    paths-ignore:
+      - '**/*.md'  # 忽略所有.md文件的更改
+jobs:
+  build: # 构建
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.20'
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Grant execute permission for build.sh
+        run: chmod +x ./build.sh
+      - name: Build
+        run: ./build.sh
+      - name: Upload build GoFileService-linux-amd64
+        uses: actions/upload-artifact@v3
+        with:
+          name: GoFileService-linux-amd64.tar.gz
+          path: output/GoFileService-linux-amd64.tar.gz
+      - name: Upload build GoFileService-linux-arm
+        uses: actions/upload-artifact@v3
+        with:
+          name: GoFileService-linux-arm.tar.gz
+          path: output/GoFileService-linux-arm.tar.gz
+      - name: Upload build GoFileService-windows-amd64
+        uses: actions/upload-artifact@v3
+        with:
+          name: GoFileService-windows-amd64.tar.gz
+          path: output/GoFileService-windows-amd64.tar.gz
+  release: # 发布
+    needs: build
+    # 只有在创建tag时才会触发
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download GoFileService-linux-amd64 artifact # 下载构建好的GoFileService-linux-amd64
+        uses: actions/download-artifact@v3
+        with:
+          name: GoFileService-linux-amd64.tar.gz
+          path: output/
+
+      - name: Download GoFileService-linux-arm artifact # 下载构建好的GoFileService-linux-arm
+        uses: actions/download-artifact@v3
+        with:
+          name: GoFileService-linux-arm.tar.gz
+          path: output/
+
+      - name: Download GoFileService-windows-amd64 artifact # 下载构建好的GoFileService-windows-amd64
+        uses: actions/download-artifact@v3
+        with:
+          name: GoFileService-windows-amd64.tar.gz
+          path: output/
+
+      - uses: "marvinpinto/action-automatic-releases@latest" # 发布到GitHub Release
+        with:
+          repo_token: "${{ secrets.GITHUB_TOKEN }}"
+          prerelease: true
+          files: |
+            output/*.tar.gz

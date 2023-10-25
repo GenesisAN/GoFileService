@@ -18,15 +18,42 @@ scp和sftp可能是更好选择
 
 ### 编译流程
 
-````
+```sh
 go mod tidy
-
 go build .
-````
+# 或者直接运行build.sh脚本
+```
 
+### 使用方法
+
+```yaml
+# 发起下载请求
+# 如果WORK_PATH是D:/, 文件路径是test/1.txt
+# 那么就可以下载 D:/test/1.txt
+GET: 
+   - 请求URL: http://IP:ADDRESS/DOWNLOAD_RELATIVE_PATH/文件路径
+   - HEAD:
+       - Authorization: 身份验证代码
+       - Origin: 请求来源地址
+
+# 发起上传请求
+# 如果WORK_PATH是D:/, 上传路径是test/，文件名称是1.txt
+# 那么就可以把文件上传到 D:/test/1.txt
+POST:
+    - 请求URL: http://IP:ADDRESS/UPLOAD_RELATIVE_PATH
+    - HEAD:
+         - Authorization: 身份验证代码
+         - Origin: 请求来源地址
+    - BODY: # form-data格式
+         - file: 要上传的文件
+         - to: 上传路径
+
+# ADDRESS,DOWNLOAD_RELATIVE_PATH，UPLOAD_RELATIVE_PATH在.env文件中配置
+# Authorization和Origin需要填的值在auth.yaml文件中配置
+```
 ### .env配置文件说明
 
-```sh
+```dotenv
 # 开启服务的端口
 ADDRESS=":5050"
 # 工作目录，用于存放上传和下载的文件
@@ -59,7 +86,7 @@ UPLOAD_RELATIVE_PATH="/upload"
 
 ### auth.yaml配置文件说明
 
-```
+```yaml
 # 授权可访问的Origin，如果地址在这里配置了
 # 那么就不会使用AuthorizationHeader进行身份验证，而直接允许访问
 AuthorizedIPs:
