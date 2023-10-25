@@ -2,15 +2,16 @@ package main
 
 import (
 	"fmt"
-	"github.com/gin-gonic/gin"
-	"github.com/joho/godotenv"
-	"gopkg.in/yaml.v3"
 	"log"
 	"mime/multipart"
 	"net/http"
 	"net/url"
 	"os"
 	"time"
+
+	"github.com/gin-gonic/gin"
+	"github.com/joho/godotenv"
+	"gopkg.in/yaml.v3"
 )
 
 const mb = 1024 * 1024
@@ -27,8 +28,8 @@ func main() {
 
 	r := gin.Default()
 	r.Use(IPAndAuthorizationMiddleware())
-	r.GET("/d/*path", handleDownload)
-	r.POST("/u", handleUpload)
+	r.GET(os.Getenv("DOWNLOAD_RELATIVE_PATH")+"/*path", handleDownload)
+	r.POST(os.Getenv("UPLOAD_RELATIVE_PATH"), handleUpload)
 	if os.Getenv("HTTPS") == "true" {
 		err := r.RunTLS(os.Getenv("ADDRESS"), os.Getenv("HTTPS_CERT_FILE"), os.Getenv("HTTPS_KEY_FILE"))
 		if err != nil {

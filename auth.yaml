@@ -1,6 +1,6 @@
-# 验证IP
+# 授权可访问的Origin，如果地址在这里配置了，那么就不会使用AuthorizationHeader进行身份验证，而直接允许访问
 AuthorizedIPs:
  - 127.0.0.1
 
-# 验证密钥
+# 身份验证代码，在没有授权地址的情况下，会使用这里的代码进行身份验证
 AuthorizationHeader : Authorization
