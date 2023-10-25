@@ -1,0 +1,6 @@
+# 验证IP
+AuthorizedIPs:
+ - 127.0.0.1
+
+# 验证密钥
+AuthorizationHeader : Authorization
