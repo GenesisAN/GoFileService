@@ -23,15 +23,21 @@ const mb = 1024 * 1024
 var workPath string
 
 func main() {
-
+	// Load environment variables
 	if err := loadEnv(); err != nil {
 		log.Fatalf("Error loading .env file: %v", err)
 	}
+	// Ensure path is cleaned up to prevent traversal or irregularities
 	workPath = filepath.Clean(os.Getenv("WORK_PATH"))
+
 	r := gin.Default()
+
+	// Use middlewares for IP and Authorization
 	r.Use(IPAndAuthorizationMiddleware())
 	r.GET(os.Getenv("DOWNLOAD_RELATIVE_PATH")+"/*path", handleDownload)
 	r.POST(os.Getenv("UPLOAD_RELATIVE_PATH"), handleUpload)
+
+	// Determine if HTTPS should be used
 	if os.Getenv("HTTPS") == "true" {
 		err := r.RunTLS(os.Getenv("ADDRESS"), filepath.Clean(os.Getenv("HTTPS_CERT_FILE")), filepath.Clean(os.Getenv("HTTPS_KEY_FILE")))
 		if err != nil {
@@ -43,9 +49,9 @@ func main() {
 			panic(err)
 		}
 	}
-
 }
 
+// Load environment variables from .env file
 func loadEnv() error {
 	var err error
 	err = godotenv.Load()
@@ -53,6 +59,7 @@ func loadEnv() error {
 	return err
 }
 
+// Handle download requests
 func handleDownload(c *gin.Context) {
 	startTime := time.Now()
 
@@ -82,12 +89,14 @@ func handleDownload(c *gin.Context) {
 		return
 	}
 
+	// Send the file to the client
 	c.File(filePath)
 
 	logMessage := logTransferDetails(c, "Downloaded", fullPath, fileInfo.Size(), startTime)
 	c.JSON(http.StatusOK, gin.H{"status": "ok", "message": logMessage})
 }
 
+// Handle upload requests
 func handleUpload(c *gin.Context) {
 	startTime := time.Now()
 
@@ -98,6 +107,7 @@ func handleUpload(c *gin.Context) {
 
 	destPath := filepath.Clean(filepath.Join(workPath, to, file.Filename))
 
+	// Ensure the path is still within the expected directory
 	if !strings.HasPrefix(destPath, workPath) {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "invalid path or filename"})
 		return
@@ -116,6 +126,7 @@ func handleUpload(c *gin.Context) {
 		return
 	}
 
+	// Save the uploaded file to the destination path
 	if err = c.SaveUploadedFile(file, destPath); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
 		return
@@ -125,6 +136,7 @@ func handleUpload(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": "ok", "message": logMessage})
 }
 
+// Compute the SHA-256 hash of the provided file
 func hashFile(file *multipart.FileHeader) (string, error) {
 	src, err := file.Open()
 	if err != nil {
@@ -140,6 +152,7 @@ func hashFile(file *multipart.FileHeader) (string, error) {
 	return hex.EncodeToString(hasher.Sum(nil)), nil
 }
 
+// Compute the SHA-256 hash of the file located at the provided path
 func hashFileAtPath(path string) (string, error) {
 	file, err := os.Open(path)
 	if err != nil {
@@ -155,6 +168,7 @@ func hashFileAtPath(path string) (string, error) {
 	return hex.EncodeToString(hasher.Sum(nil)), nil
 }
 
+// Extract the details of the uploaded file from the request context
 func getUploadDetails(c *gin.Context) (*multipart.FileHeader, string, error) {
 	file, err := c.FormFile("file")
 	if err != nil {
@@ -171,6 +185,7 @@ func getUploadDetails(c *gin.Context) (*multipart.FileHeader, string, error) {
 	return file, to, nil
 }
 
+// Log transfer details for monitoring and analytics
 func logTransferDetails(c *gin.Context, action, path string, size int64, startTime time.Time) string {
 	duration := time.Since(startTime).Seconds()
 	speed := float64(size) / (mb * duration)
