@@ -1,37 +1,39 @@
 package main
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
+	"io"
 	"log"
 	"mime/multipart"
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
-	"gopkg.in/yaml.v3"
 )
 
 const mb = 1024 * 1024
 
 var workPath string
-var AuthIP map[string]bool
-var AuthorizationHeader string
 
 func main() {
 
 	if err := loadEnv(); err != nil {
 		log.Fatalf("Error loading .env file: %v", err)
 	}
-	workPath = os.Getenv("WORK_PATH")
+	workPath = filepath.Clean(os.Getenv("WORK_PATH"))
 	r := gin.Default()
 	r.Use(IPAndAuthorizationMiddleware())
 	r.GET(os.Getenv("DOWNLOAD_RELATIVE_PATH")+"/*path", handleDownload)
 	r.POST(os.Getenv("UPLOAD_RELATIVE_PATH"), handleUpload)
 	if os.Getenv("HTTPS") == "true" {
-		err := r.RunTLS(os.Getenv("ADDRESS"), os.Getenv("HTTPS_CERT_FILE"), os.Getenv("HTTPS_KEY_FILE"))
+		err := r.RunTLS(os.Getenv("ADDRESS"), filepath.Clean(os.Getenv("HTTPS_CERT_FILE")), filepath.Clean(os.Getenv("HTTPS_KEY_FILE")))
 		if err != nil {
 			panic(err)
 		}
@@ -44,12 +46,10 @@ func main() {
 
 }
 
-var authconfig *AutoConfig
-
 func loadEnv() error {
 	var err error
 	err = godotenv.Load()
-	LoadConfig(os.Getenv("AUTH_CONFIG_FILE"))
+	err = LoadConfig(filepath.Clean(os.Getenv("AUTH_CONFIG_FILE")))
 	return err
 }
 
@@ -63,16 +63,21 @@ func handleDownload(c *gin.Context) {
 		return
 	}
 
-	// 使用decodedPath替代fullPath来访问文件
-	filePath := os.Getenv("WORK_PATH") + decodedPath
+	// Use filepath.Join to combine paths safely
+	filePath := filepath.Join(workPath, decodedPath)
 
-	if !fileExists(filePath) {
-		c.JSON(http.StatusNotFound, gin.H{"status": "file not found"})
+	// Ensure the path is still within the expected directory to prevent path traversal attacks
+	if !strings.HasPrefix(filePath, workPath) {
+		c.JSON(http.StatusBadRequest, gin.H{"status": "invalid path"})
 		return
 	}
 
 	fileInfo, err := os.Stat(filePath)
-	if err != nil {
+
+	if os.IsNotExist(err) {
+		c.JSON(http.StatusNotFound, gin.H{"status": "file not found"})
+		return
+	} else if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"status": "error getting file info"})
 		return
 	}
@@ -80,7 +85,7 @@ func handleDownload(c *gin.Context) {
 	c.File(filePath)
 
 	logMessage := logTransferDetails(c, "Downloaded", fullPath, fileInfo.Size(), startTime)
-	c.String(http.StatusOK, logMessage)
+	c.JSON(http.StatusOK, gin.H{"status": "ok", "message": logMessage})
 }
 
 func handleUpload(c *gin.Context) {
@@ -91,7 +96,25 @@ func handleUpload(c *gin.Context) {
 		return
 	}
 
-	destPath := workPath + to + file.Filename
+	destPath := filepath.Clean(filepath.Join(workPath, to, file.Filename))
+
+	if !strings.HasPrefix(destPath, workPath) {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "invalid path or filename"})
+		return
+	}
+
+	// Check if the file already exists at the destination
+	if _, err := os.Stat(destPath); !os.IsNotExist(err) {
+		uploadedFileHash, _ := hashFile(file)
+		existingFileHash, _ := hashFileAtPath(destPath)
+
+		c.JSON(http.StatusConflict, gin.H{
+			"message":          "file already exists",
+			"existingFileHash": existingFileHash,
+			"uploadedFileHash": uploadedFileHash,
+		})
+		return
+	}
 
 	if err = c.SaveUploadedFile(file, destPath); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
@@ -99,7 +122,37 @@ func handleUpload(c *gin.Context) {
 	}
 
 	logMessage := logTransferDetails(c, "Uploaded", file.Filename, file.Size, startTime)
-	c.String(http.StatusOK, "File uploaded successfully!\n"+logMessage)
+	c.JSON(http.StatusOK, gin.H{"status": "ok", "message": logMessage})
+}
+
+func hashFile(file *multipart.FileHeader) (string, error) {
+	src, err := file.Open()
+	if err != nil {
+		return "", err
+	}
+	defer src.Close()
+
+	hasher := sha256.New()
+	if _, err := io.Copy(hasher, src); err != nil {
+		return "", err
+	}
+
+	return hex.EncodeToString(hasher.Sum(nil)), nil
+}
+
+func hashFileAtPath(path string) (string, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+
+	hasher := sha256.New()
+	if _, err := io.Copy(hasher, file); err != nil {
+		return "", err
+	}
+
+	return hex.EncodeToString(hasher.Sum(nil)), nil
 }
 
 func getUploadDetails(c *gin.Context) (*multipart.FileHeader, string, error) {
@@ -118,58 +171,10 @@ func getUploadDetails(c *gin.Context) (*multipart.FileHeader, string, error) {
 	return file, to, nil
 }
 
-func fileExists(path string) bool {
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		return false
-	}
-	return true
-}
-
 func logTransferDetails(c *gin.Context, action, path string, size int64, startTime time.Time) string {
 	duration := time.Since(startTime).Seconds()
 	speed := float64(size) / (mb * duration)
 	message := fmt.Sprintf("IP: %s | %s file: %s | Size: %d bytes | Speed: %.2f MB/s", c.ClientIP(), action, path, size, speed)
 	log.Println(message)
 	return message
-}
-func LoadConfig(filename string) error {
-	var config AutoConfig
-
-	// 读取文件内容
-	data, err := os.ReadFile(filename)
-	if err != nil {
-		return err
-	}
-	// 解析YAML内容到结构体中
-	err = yaml.Unmarshal(data, &config)
-	if err != nil {
-		return err
-	}
-	AuthIP = make(map[string]bool)
-	for _, ip := range config.AuthorizedIPs {
-		AuthIP[ip] = true
-	}
-	AuthorizationHeader = config.AuthorizationHeader
-	return nil
-}
-
-type AutoConfig struct {
-	AuthorizedIPs       []string `yaml:"AuthorizedIPs"`
-	AuthorizationHeader string   `yaml:"AuthorizationHeader"`
-}
-
-func IPAndAuthorizationMiddleware() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		clientIP := c.ClientIP()
-		if !AuthIP[clientIP] {
-			// 如果IP不在授权列表中，检查授权码
-			authorizationCode := c.GetHeader("Authorization")
-			if authorizationCode != AuthorizationHeader {
-				c.JSON(http.StatusForbidden, gin.H{"status": "unauthorized"})
-				c.Abort()
-				return
-			}
-		}
-		c.Next()
-	}
 }
