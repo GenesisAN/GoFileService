@@ -29,7 +29,8 @@ go build .
 ```yaml
 # 发起下载请求
 # 如果WORK_PATH是D:/, 文件路径是test/1.txt
-# 那么就可以下载 D:/test/1.txt
+# 那么通过 HTTP GET http://IP:ADDRESS/DOWNLOAD_RELATIVE_PATH/test/1.txt
+# 就可以下载到D:/test/1.txt
 GET: 
    - 请求URL: http://IP:ADDRESS/DOWNLOAD_RELATIVE_PATH/文件路径
    - HEAD:
@@ -38,7 +39,11 @@ GET:
 
 # 发起上传请求
 # 如果WORK_PATH是D:/, 上传路径是test/，文件名称是1.txt
-# 那么就可以把文件上传到 D:/test/1.txt
+# 那么通过 HTTP POST http://IP:ADDRESS/UPLOAD_RELATIVE_PATH
+# BODY: form-data
+#  to参数的值是/test/，
+#  file参数的值是1.txt
+# 就会上传到D:/test/1.txt
 POST:
     - 请求URL: http://IP:ADDRESS/UPLOAD_RELATIVE_PATH
     - HEAD:
@@ -88,7 +93,7 @@ UPLOAD_RELATIVE_PATH="/upload"
 
 ```yaml
 # 授权可访问的Origin，如果地址在这里配置了
-# 那么就不会使用AuthorizationHeader进行身份验证，而直接允许访问
+# 那么就不会使用AuthorizationHeader进行身份验证，而直接允许访问，可以是网址或者IP
 AuthorizedIPs:
  - 127.0.0.1
 
