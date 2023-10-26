@@ -7,6 +7,8 @@ on:
       - 'v*'
     paths-ignore:
       - '**/*.md'  # 忽略所有.md文件的更改
+      - '**/*.env' # 忽略所有.env文件的更改
+      - '**/*.yaml' # 忽略所有.yml文件的更改
 jobs:
   build: # 构建
     runs-on: ubuntu-latest
