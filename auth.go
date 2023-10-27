@@ -3,8 +3,10 @@ package main
 import (
 	"github.com/gin-gonic/gin"
 	"gopkg.in/yaml.v3"
+	"net"
 	"net/http"
 	"os"
+	"strings"
 )
 
 type AutoConfig struct {
@@ -12,7 +14,7 @@ type AutoConfig struct {
 	AuthorizationHeader string   `yaml:"AuthorizationHeader"`
 }
 
-var AuthIP map[string]bool
+var AuthIPRanges []*net.IPNet
 var AuthorizationHeader string
 
 func LoadConfig(filename string) error {
@@ -28,9 +30,17 @@ func LoadConfig(filename string) error {
 	if err != nil {
 		return err
 	}
-	AuthIP = make(map[string]bool)
-	for _, ip := range config.AuthorizedIPs {
-		AuthIP[ip] = true
+	AuthIPRanges = make([]*net.IPNet, len(config.AuthorizedIPs))
+	for i, ipOrCIDR := range config.AuthorizedIPs {
+		if !strings.Contains(ipOrCIDR, "/") {
+			// 如果它是一个单独的IP地址，自动添加/32
+			ipOrCIDR = ipOrCIDR + "/32"
+		}
+		_, ipNet, err := net.ParseCIDR(ipOrCIDR)
+		if err != nil {
+			return err
+		}
+		AuthIPRanges[i] = ipNet
 	}
 	AuthorizationHeader = config.AuthorizationHeader
 	return nil
@@ -38,8 +48,15 @@ func LoadConfig(filename string) error {
 
 func IPAndAuthorizationMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		clientIP := c.ClientIP()
-		if !AuthIP[clientIP] {
+		clientIP := net.ParseIP(c.ClientIP())
+		authorized := false
+		for _, ipRange := range AuthIPRanges {
+			if ipRange.Contains(clientIP) {
+				authorized = true
+				break
+			}
+		}
+		if !authorized {
 			// 如果IP不在授权列表中，检查授权码
 			authorizationCode := c.GetHeader("Authorization")
 			if authorizationCode != AuthorizationHeader {
