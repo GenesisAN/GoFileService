@@ -1,5 +1,15 @@
 #!/bin/bash
 
+
+# 检查第一个参数是否是 is "release"
+if [ "$1" == "release" ] || [ "$1" == "r" ]; then
+    MODE_FLAG="-X main.mod=release"
+else
+    MODE_FLAG="-X main.mod=debug"
+fi
+
+
+
 REPO_NAME=$(basename $(git rev-parse --show-toplevel))
 
 # 获取最新提交的哈希值
@@ -35,30 +45,48 @@ fi
 # 其他变量
 GIT_HASH=$(git rev-parse HEAD)
 BUILD_DATE=$(date +%Y-%m-%dT%H:%M:%S)
-LD_FLAGS="-X main.version=$VERSION -X main.buildDate=$BUILD_DATE -X main.gitHash=$GIT_HASH"
+LD_FLAGS="-X main.version=$VERSION -X main.buildDate=$BUILD_DATE -X main.gitHash=$GIT_HASH $MODE_FLAG"
 
-echo "REPO_NAME=$REPO_NAME"
-echo "VERSION=$VERSION"
-echo "BUILD_DATE=$BUILD_DATE"
-echo "GIT_HASH=$GIT_HASH"
+# 打印信息
+echo "=============================================="
+echo "            BUILD INFORMATION"
+echo "=============================================="
+echo ""
+echo "REPO_NAME:   $REPO_NAME"
+echo "VERSION:     $VERSION"
+echo "BUILD_DATE:  $BUILD_DATE"
+echo "GIT_HASH:    $GIT_HASH"
+echo "MODE_FLAG:   $MODE_FLAG"
+echo ""
+echo "=============================================="
+echo "            BUILD PROCESS"
+echo "=============================================="
 
-echo "Building $REPO_NAME-linux-arm"
 
+# 编译流程
+echo "Running 'go mod tidy'"
 go mod tidy
 
-# 编译 ARM、x64 的 Linux 版本
+# Build ARM Linux version
+echo "Building $REPO_NAME-linux-arm"
 GOOS=linux GOARCH=arm go build -ldflags "$LD_FLAGS" -o "output/$REPO_NAME-linux-arm" ./...
 
+# Build AMD64 Linux version
 echo "Building $REPO_NAME-linux-amd64"
 GOOS=linux GOARCH=amd64 go build -ldflags "$LD_FLAGS" -o "output/$REPO_NAME-linux-amd64" ./...
 
+# Build Windows AMD64 version with .exe extension
 echo "Building $REPO_NAME-windows-amd64.exe"
-# 编译 x64 的 Windows 版本并附加 .exe 扩展名
 GOOS=windows GOARCH=amd64 go build -ldflags "$LD_FLAGS" -o "output/$REPO_NAME-windows-amd64.exe" ./...
 
+# 进入output目录
 cd "output"
 
-# 打包输出文件并携带 .env 和 auth.yaml 文件
+# 将 .env 和 auth.yaml 打包到输出产物
+echo "=============================================="
+echo "            PACKAGING"
+echo "=============================================="
+echo ""
 echo "Packaging $REPO_NAME-linux-arm.tar.gz"
 tar -czf "$REPO_NAME-linux-arm.tar.gz" "$REPO_NAME-linux-arm" ../.env ../auth.yaml
 
@@ -68,8 +96,14 @@ tar -czf "$REPO_NAME-linux-amd64.tar.gz" "$REPO_NAME-linux-amd64" ../.env ../aut
 echo "Packaging $REPO_NAME-windows-amd64.tar.gz"
 tar -czf "$REPO_NAME-windows-amd64.tar.gz" "$REPO_NAME-windows-amd64.exe" ../.env ../auth.yaml
 
-rm "$REPO_NAME-linux-arm"
-rm "$REPO_NAME-linux-amd64"
-rm "$REPO_NAME-windows-amd64.exe"
+# 清理临时文件
+echo "=============================================="
+echo "            CLEAN UP"
+echo "=============================================="
+echo ""
+echo "Removing temporary files"
+#rm "$REPO_NAME-linux-arm"
+#rm "$REPO_NAME-linux-amd64"
+#rm "$REPO_NAME-windows-amd64.exe"
 
 echo "Packaging complete!"
