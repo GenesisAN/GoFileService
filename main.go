@@ -25,12 +25,19 @@ var (
 	buildDate string
 	gitHash   string
 	workPath  string
+	mod       string
 )
 
 func main() {
 	if len(os.Args) > 1 && os.Args[1] == "-version" {
-		fmt.Printf("Version: %s\nBuild Date: %s\nGit Commit: %s\n", version, buildDate, gitHash)
+		fmt.Printf("Version: %s\nBuild Date: %s\nGit Commit: %s\nMod:%s\n", version, buildDate, gitHash, mod)
 		return
+	}
+
+	if len(os.Args) > 1 && os.Args[1] == "-mod" {
+		gin.SetMode(os.Args[2])
+	} else {
+		gin.SetMode(mod)
 	}
 
 	// Load environment variables
