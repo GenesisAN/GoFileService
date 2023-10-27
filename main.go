@@ -21,10 +21,10 @@ import (
 const mb = 1024 * 1024
 
 var (
-    version   string
-    buildDate string
-    gitHash   string
-    workPath string
+	version   string
+	buildDate string
+	gitHash   string
+	workPath  string
 )
 
 func main() {
@@ -32,7 +32,7 @@ func main() {
 		fmt.Printf("Version: %s\nBuild Date: %s\nGit Commit: %s\n", version, buildDate, gitHash)
 		return
 	}
-	
+
 	// Load environment variables
 	if err := loadEnv(); err != nil {
 		log.Fatalf("Error loading .env file: %v", err)
@@ -102,8 +102,8 @@ func handleDownload(c *gin.Context) {
 	// Send the file to the client
 	c.File(filePath)
 
-	logMessage := logTransferDetails(c, "Downloaded", fullPath, fileInfo.Size(), startTime)
-	c.JSON(http.StatusOK, gin.H{"status": "ok", "message": logMessage})
+	// Log the transfer details
+	logTransferDetails(c, "Downloaded", fullPath, fileInfo.Size(), startTime)
 }
 
 // Handle upload requests
@@ -125,9 +125,19 @@ func handleUpload(c *gin.Context) {
 
 	// Check if the file already exists at the destination
 	if _, err := os.Stat(destPath); !os.IsNotExist(err) {
-		uploadedFileHash, _ := hashFile(file)
-		existingFileHash, _ := hashFileAtPath(destPath)
+		uploadedFileHash, err := hashFile(file)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"message": "error calculating uploaded file hash"})
+			return
+		}
 
+		existingFileHash, err := hashFileAtPath(destPath)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"message": "error calculating existing file hash"})
+			return
+		}
+
+		// If you want to handle file override, you can add logic here
 		c.JSON(http.StatusConflict, gin.H{
 			"message":          "file already exists",
 			"existingFileHash": existingFileHash,
