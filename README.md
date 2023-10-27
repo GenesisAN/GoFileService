@@ -1,6 +1,15 @@
-# GoFileService
 
-基于Golang编写的简易文件服务。
+
+<h1 align="center">
+  GoFileService是基于Golang编写的简易文件服务
+</h1>
+
+<p align="center">
+  <img src="https://img.shields.io/github/v/release/GenesisAN/GoFileService?label=version">
+  <img src="https://img.shields.io/github/actions/workflow/status/GenesisAN/GoFileService/build.yml">
+</p>
+
+
 
 - [x] 文件上传
 
