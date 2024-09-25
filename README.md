@@ -71,7 +71,7 @@ POST:
 # 开启服务的端口
 ADDRESS=":5050"
 # 工作目录，用于存放上传和下载的文件
-WORK_PATH="D:/"
+WORK_PATH="./"
 # 是否启用HTTPS(true/false)
 HTTPS="false"
 # TLS证书路径
