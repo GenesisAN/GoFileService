@@ -39,7 +39,7 @@ func main() {
 	} else {
 		gin.SetMode(mod)
 	}
-
+	log.Printf("Go File Server(%s) Start\n", version)
 	// Load environment variables
 	if err := loadEnv(); err != nil {
 		log.Fatalf("Error loading .env file: %v", err)
@@ -72,6 +72,10 @@ func main() {
 func loadEnv() error {
 	var err error
 	err = godotenv.Load()
+	//检查是否存在 AUTH_CONFIG_FILE 环境变量
+	if os.Getenv("AUTH_CONFIG_FILE") == "" {
+		os.Setenv("AUTH_CONFIG_FILE", "./auth.yaml")
+	}
 	err = LoadConfig(filepath.Clean(os.Getenv("AUTH_CONFIG_FILE")))
 	return err
 }

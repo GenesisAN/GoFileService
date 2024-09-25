@@ -1,12 +1,16 @@
 package main
 
 import (
-	"github.com/gin-gonic/gin"
-	"gopkg.in/yaml.v3"
+	"embed"
+	"errors"
+	"fmt"
 	"net"
 	"net/http"
 	"os"
 	"strings"
+
+	"github.com/gin-gonic/gin"
+	"gopkg.in/yaml.v3"
 )
 
 type AutoConfig struct {
@@ -17,8 +21,28 @@ type AutoConfig struct {
 var AuthIPRanges []*net.IPNet
 var AuthorizationHeader string
 
+//go:embed auth.yaml
+var defaultAuthFile embed.FS
+
+// 释放嵌入的 auth.yaml 文件
+func releaseDefaultConfig(filename string) error {
+	data, err := defaultAuthFile.ReadFile("auth.yaml")
+	if err != nil {
+		return fmt.Errorf("failed to read embedded file: %w", err)
+	}
+	return os.WriteFile(filename, data, 0644)
+}
+
 func LoadConfig(filename string) error {
 	var config AutoConfig
+
+	// 检查文件是否存在
+	if _, err := os.Stat(filename); errors.Is(err, os.ErrNotExist) {
+		fmt.Printf("File %s does not exist, releasing embedded auth.yaml file...\n", filename)
+		if err := releaseDefaultConfig(filename); err != nil {
+			return fmt.Errorf("failed to release embedded file: %w", err)
+		}
+	}
 
 	// 读取文件内容
 	data, err := os.ReadFile(filename)
